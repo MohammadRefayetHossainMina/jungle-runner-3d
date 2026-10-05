@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jungle Runner 3D</title>
+    <!-- Tailwind CSS for UI overlay -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js for 3D graphics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- FontAwesome for UI Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap');
+        
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #0b1d0e;
+            color: #fff;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Custom text stroke effect for arcade title feel */
+        .text-stroke {
+            -webkit-text-stroke: 2px #1c3d14;
+        }
+
+        .text-glow {
+            text-shadow: 0 0 15px rgba(234, 179, 8, 0.6);
+        }
+
+        /* Custom scrollbar for tutorial modal */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #22c55e;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="relative min-h-screen overflow-hidden select-none">
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container" class="absolute inset-0 z-0"></div>
+
+    <!-- UI Overlay Layer -->
+    <div id="ui-layer" class="absolute inset-0 z-10 pointer-events-none flex flex-col justify-between p-4 sm:p-6">
+        
+        <!-- Top Bar: Scores & Stats (HUD) -->
+        <div id="hud" class="flex justify-between items-start w-full opacity-0 transition-opacity duration-300">
+            <!-- Score & Distance -->
+            <div class="bg-black/40 backdrop-blur-md border border-emerald-500/30 rounded-2xl p-3 sm:p-4 text-left shadow-lg">
+                <div class="text-xs uppercase tracking-wider text-emerald-400 font-bold">Distance</div>
+                <div class="text-2xl sm:text-4xl font-black text-white leading-none tracking-tight">
+                    <span id="hud-distance">0</span><span class="text-xs font-normal text-emerald-300 ml-1">m</span>
+                </div>
+                <div class="mt-2 text-xs uppercase tracking-wider text-amber-400 font-bold">Score</div>
+                <div class="text-lg sm:text-2xl font-extrabold text-amber-300 leading-none" id="hud-score">0</div>
+            </div>
+
+            <!-- Coins & Multiplier -->
+            <div class="bg-black/40 backdrop-blur-md border border-amber-500/30 rounded-2xl p-3 sm:p-4 text-right shadow-lg flex flex-col items-end">
+                <div class="flex items-center gap-2 text-amber-400">
+                    <i class="fa-solid fa-coins text-xl text-amber-300 animate-bounce"></i>
+                    <span class="text-2xl sm:text-4xl font-black leading-none text-white" id="hud-coins">0</span>
+                </div>
+                <div class="mt-2 bg-emerald-950/80 border border-emerald-500/50 px-2.5 py-1 rounded-full text-xs font-bold text-emerald-300">
+                    Speed: <span id="hud-speed">1.0</span>x
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Touch Controls Visual Indicators (Visible only on touch screens) -->
+        <div id="touch-controls" class="sm:hidden pointer-events-auto grid grid-cols-3 gap-2 w-full max-w-xs mx-auto mb-4 opacity-70">
+            <button id="btn-left" class="bg-black/40 border border-emerald-500/30 text-emerald-400 p-4 rounded-2xl text-2xl active:bg-emerald-600 active:text-white transition">
+                <i class="fa-solid fa-arrow-left"></i>
+            </button>
+            <div class="grid grid-rows-2 gap-2">
+                <button id="btn-jump" class="bg-black/40 border border-emerald-500/30 text-emerald-400 p-2 rounded-xl text-lg active:bg-emerald-600 active:text-white transition">
+                    <i class="fa-solid fa-arrow-up"></i>
+                </button>
+                <button id="btn-slide" class="bg-black/40 border border-emerald-500/30 text-emerald-400 p-2 rounded-xl text-lg active:bg-emerald-600 active:text-white transition">
+                    <i class="fa-solid fa-arrow-down"></i>
+                </button>
+            </div>
+            <button id="btn-right" class="bg-black/40 border border-emerald-500/30 text-emerald-400 p-4 rounded-2xl text-2xl active:bg-emerald-600 active:text-white transition">
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Start Screen Modal -->
+    <div id="start-modal" class="absolute inset-0 z-20 flex items-center justify-center p-4 bg-gradient-to-b from-black/80 via-black/60 to-emerald-950/90 backdrop-blur-sm">
+        <div class="max-w-md w-full bg-slate-900/90 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 text-center shadow-2xl relative overflow-hidden">
+            <!-- Decorative jungle glowing elements -->
+            <div class="absolute -top-12 -left-12 w-32 h-32 bg-emerald-500/20 rounded-full blur-2xl"></div>
+            <div class="absolute -bottom-12 -right-12 w-32 h-32 bg-amber-500/20 rounded-full blur-2xl"></div>
+
+            <div class="relative z-10">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-3">
+                    <i class="fa-solid fa-tree"></i> 3D Endless Runner
+                </div>
+                <h1 class="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-emerald-400 to-green-300 tracking-tight text-glow">
+                    JUNGLE RUN
+                </h1>
+                <p class="text-slate-400 text-sm mt-2 mb-6">Dodge obstacles, leap over ancient logs, slide under traps, and collect ancient gold relics!</p>
+
+                <!-- High Score Card -->
+                <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-3 mb-6 flex justify-around items-center">
+                    <div>
+                        <div class="text-xs text-slate-400 uppercase font-bold">Best Score</div>
+                        <div class="text-xl font-black text-amber-400" id="start-high-score">0</div>
+                    </div>
+                    <div class="h-8 w-[1px] bg-slate-700"></div>
+                    <div>
+                        <div class="text-xs text-slate-400 uppercase font-bold">Max Distance</div>
+                        <div class="text-xl font-black text-emerald-400" id="start-high-distance">0m</div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex flex-col gap-3">
+                    <button id="btn-start" class="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-black text-xl shadow-lg shadow-emerald-900/40 transform active:scale-95 transition flex items-center justify-center gap-3 pointer-events-auto cursor-pointer">
+                        <i class="fa-solid fa-play"></i> START RUNNING
+                    </button>
+                    <button id="btn-tutorial" class="w-full py-3 rounded-2xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 font-bold text-sm transform active:scale-95 transition pointer-events-auto cursor-pointer flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-gamepad"></i> How to Play
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- How to Play Modal -->
+    <div id="tutorial-modal" class="hidden absolute inset-0 z-30 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+        <div class="max-w-md w-full bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 text-left shadow-2xl relative max-h-[90vh] flex flex-col">
+            <h2 class="text-2xl font-extrabold text-amber-400 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-circle-info"></i> How to Play
+            </h2>
+
+            <div class="space-y-4 overflow-y-auto pr-2 text-sm text-slate-300">
+                <div class="flex items-center gap-4 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                    <div class="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-xl font-bold">
+                        <i class="fa-solid fa-arrows-left-right"></i>
+                    </div>
+                    <div>
+                        <div class="font-bold text-white">Left / Right Arrow (or A / D)</div>
+                        <div class="text-xs text-slate-400">Switch lanes left and right to dodge obstacles.</div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                    <div class="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-xl font-bold">
+                        <i class="fa-solid fa-arrow-up"></i>
+                    </div>
+                    <div>
+                        <div class="font-bold text-white">Up Arrow / W / Space</div>
+                        <div class="text-xs text-slate-400">Jump over low logs, spike traps, and gaps.</div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                    <div class="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-xl font-bold">
+                        <i class="fa-solid fa-arrow-down"></i>
+                    </div>
+                    <div>
+                        <div class="font-bold text-white">Down Arrow / S</div>
+                        <div class="text-xs text-slate-400">Slide under fallen archways and high jungle branches.</div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                    <div class="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-xl font-bold">
+                        <i class="fa-solid fa-mobile-screen"></i>
+                    </div>
+                    <div>
+                        <div class="font-bold text-white">Swipe Gestures & Touch Buttons</div>
+                        <div class="text-xs text-slate-400">Swipe Left, Right, Up, or Down on mobile devices.</div>
+                    </div>
+                </div>
+            </div>
+
+            <button id="btn-close-tutorial" class="mt-6 w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-md transition pointer-events-auto cursor-pointer">
+                Got it! Let's Run
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen Modal -->
+    <div id="gameover-modal" class="hidden absolute inset-0 z-20 flex items-center justify-center p-4 bg-gradient-to-b from-black/90 via-red-950/40 to-black/90 backdrop-blur-md">
+        <div class="max-w-md w-full bg-slate-900/95 border border-red-500/40 rounded-3xl p-6 sm:p-8 text-center shadow-2xl relative overflow-hidden">
+            <h2 class="text-4xl font-black text-red-500 tracking-tight mb-1 animate-pulse">CRASHED!</h2>
+            <p class="text-slate-400 text-sm mb-6">The jungle claimed another explorer...</p>
+
+            <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4 mb-6 space-y-3">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-400">Distance Travelled:</span>
+                    <span id="go-distance" class="font-bold text-emerald-400 text-lg">0m</span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-400">Coins Collected:</span>
+                    <span id="go-coins" class="font-bold text-amber-400 text-lg">0</span>
+                </div>
+                <div class="h-[1px] bg-slate-700/80"></div>
+                <div class="flex justify-between items-center text-base">
+                    <span class="text-slate-200 font-bold">Final Score:</span>
+                    <span id="go-score" class="font-black text-amber-300 text-2xl">0</span>
+                </div>
+                <div id="new-highscore-tag" class="hidden bg-amber-500/20 border border-amber-500/50 text-amber-300 text-xs font-black uppercase py-1 px-3 rounded-full inline-block animate-bounce">
+                    🎉 NEW HIGH SCORE! 🎉
+                </div>
+            </div>
+
+            <button id="btn-restart" class="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-black text-xl shadow-lg shadow-amber-900/40 transform active:scale-95 transition flex items-center justify-center gap-3 pointer-events-auto cursor-pointer">
+                <i class="fa-solid fa-rotate-right"></i> RUN AGAIN
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* =========================================================================
+           WEB AUDIO API SOUND SYNTHESIZER (No external audio file downloads)
+           ========================================================================= */
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            // Coin Pickup Chime
+            playCoin() {
+                if (!this.ctx || this.muted) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(987.77, now); // B5
+                osc.frequency.exponentialRampToValueAtTime(1318.51, now + 0.1); // E6
+
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+
+            // Jump Sound
+            playJump() {
+                if (!this.ctx || this.muted) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(450, now + 0.15);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+
+            // Slide Swoosh Sound
+            playSlide() {
+                if (!this.ctx || this.muted) return;
+                const now = this.ctx.currentTime;
+                
+                // Noise buffer for swoosh
+                const bufferSize = this.ctx.sampleRate * 0.2;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const output = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(800, now);
+                filter.frequency.exponentialRampToValueAtTime(200, now + 0.2);
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                noise.start(now);
+            }
+
+            // Crash Sound
+            playCrash() {
+                if (!this.ctx || this.muted) return;
+                const now = this.ctx.currentTime;
+                
+                const bufferSize = this.ctx.sampleRate * 0.4;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const output = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(1000, now);
+                filter.frequency.exponentialRampToValueAtTime(50, now + 0.4);
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.6, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                noise.start(now);
+            }
+        }
+
+        const sound = new SoundFX();
+
+        /* =========================================================================
+           GAME ENGINE & THREE.JS 3D WORLD SETUP
+           ========================================================================= */
+        const LANES = [-2.5, 0, 2.5]; // Left, Center, Right lane X positions
+        const INITIAL_SPEED = 18;
+        const SPEED_INCREMENT = 0.3; // Speed gain per 100 meters
+        const MAX_SPEED = 45;
+        const TRACK_CHUNK_SIZE = 40;
+        const VISIBLE_CHUNKS = 8;
+
+        let scene, camera, renderer;
+        let playerGroup, playerBody, playerHead, dustParticles;
+        let activeChunks = [];
+        let activeObstacles = [];
+        let activeCoins = [];
+        let activeParticles = [];
+
+        // Game State Variables
+        let gameState = 'START'; // 'START', 'PLAYING', 'GAMEOVER'
+        let currentLane = 1; // 0=Left, 1=Center, 2=Right
+        let targetX = 0;
+        let isJumping = false;
+        let isSliding = false;
+        let jumpVelocityY = 0;
+        let slideTimer = 0;
+        
+        let score = 0;
+        let coinsCollected = 0;
+        let distanceTraveled = 0;
+        let gameSpeed = INITIAL_SPEED;
+
+        let highScore = parseInt(localStorage.getItem('jungle_runner_highscore') || '0');
+        let highDistance = parseInt(localStorage.getItem('jungle_runner_highdist') || '0');
+
+        // Touch Input Tracking
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        // Utility to create low-poly trees
+        function createTree() {
+            const tree = new THREE.Group();
+            
+            // Trunk
+            const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 3, 5);
+            const trunkMat = new THREE.MeshLambertMaterial({ color: 0x4a2e18, flatShading: true });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 1.5;
+            trunk.castShadow = true;
+            tree.add(trunk);
+
+            // Foliage Layers
+            const foliageColors = [0x1e5e27, 0x287a35, 0x14451c];
+            for (let i = 0; i < 3; i++) {
+                const foliageGeo = new THREE.ConeGeometry(2 - i * 0.4, 2.5, 5);
+                const foliageMat = new THREE.MeshLambertMaterial({ 
+                    color: foliageColors[i % foliageColors.length], 
+                    flatShading: true 
+                });
+                const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+                foliage.position.y = 3 + i * 1.5;
+                foliage.castShadow = true;
+                tree.add(foliage);
+            }
+            return tree;
+        }
+
+        // Create Ancient Stone Pillar / Ruins
+        function createRuinPillar() {
+            const group = new THREE.Group();
+            const pillarGeo = new THREE.BoxGeometry(1.2, 5, 1.2);
+            const pillarMat = new THREE.MeshLambertMaterial({ color: 0x6e786f, flatShading: true });
+            const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+            pillar.position.y = 2.5;
+            pillar.castShadow = true;
+            group.add(pillar);
+
+            // Vine details
+            const vineGeo = new THREE.BoxGeometry(1.3, 1.5, 1.3);
+            const vineMat = new THREE.MeshLambertMaterial({ color: 0x22662c, flatShading: true });
+            const vine = new THREE.Mesh(vineGeo, vineMat);
+            vine.position.y = 2;
+            group.add(vine);
+
+            return group;
+        }
+
+        // Build Player Character Model
+        function createPlayer() {
+            playerGroup = new THREE.Group();
+
+            // Main Body (Explorer Outfit)
+            const bodyGeo = new THREE.BoxGeometry(0.8, 1.2, 0.5);
+            const bodyMat = new THREE.MeshLambertMaterial({ color: 0xc49a45, flatShading: true }); // Explorer Tan
+            playerBody = new THREE.Mesh(bodyGeo, bodyMat);
+            playerBody.position.y = 1;
+            playerBody.castShadow = true;
+            playerGroup.add(playerBody);
+
+            // Head
+            const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+            const headMat = new THREE.MeshLambertMaterial({ color: 0xffdbac, flatShading: true });
+            playerHead = new THREE.Mesh(headGeo, headMat);
+            playerHead.position.y = 1.85;
+            playerHead.castShadow = true;
+            playerGroup.add(playerHead);
+
+            // Explorer Hat
+            const hatBrimGeo = new THREE.BoxGeometry(0.9, 0.08, 0.9);
+            const hatTopGeo = new THREE.BoxGeometry(0.55, 0.3, 0.55);
+            const hatMat = new THREE.MeshLambertMaterial({ color: 0x3d2612, flatShading: true });
+            const hatBrim = new THREE.Mesh(hatBrimGeo, hatMat);
+            const hatTop = new THREE.Mesh(hatTopGeo, hatMat);
+            hatBrim.position.y = 2.15;
+            hatTop.position.y = 2.3;
+            playerGroup.add(hatBrim);
+            playerGroup.add(hatTop);
+
+            // Backpack
+            const packGeo = new THREE.BoxGeometry(0.6, 0.7, 0.3);
+            const packMat = new THREE.MeshLambertMaterial({ color: 0x2e422b, flatShading: true });
+            const pack = new THREE.Mesh(packGeo, packMat);
+            pack.position.set(0, 1.1, -0.35);
+            playerGroup.add(pack);
+
+            // Dust Trail Particle Group attached to feet
+            dustParticles = new THREE.Group();
+            playerGroup.add(dustParticles);
+
+            scene.add(playerGroup);
+        }
+
+        function createObstacle(type) {
+            const group = new THREE.Group();
+            group.userData = { type: type };
+
+            if (type === 'LOG') {
+                // Low Fallen Log (JUMP OVER)
+                const logGeo = new THREE.CylinderGeometry(0.4, 0.45, 2.2, 6);
+                const logMat = new THREE.MeshLambertMaterial({ color: 0x4a2e18, flatShading: true });
+                const log = new THREE.Mesh(logGeo, logMat);
+                log.rotation.z = Math.PI / 2;
+                log.position.y = 0.4;
+                log.castShadow = true;
+                group.add(log);
+            } 
+            else if (type === 'HIGH_BRANCH') {
+                // High Jungle Archway / Branch (SLIDE UNDER)
+                const archGeo = new THREE.BoxGeometry(2.4, 0.6, 0.6);
+                const archMat = new THREE.MeshLambertMaterial({ color: 0x3a2211, flatShading: true });
+                const arch = new THREE.Mesh(archGeo, archMat);
+                arch.position.y = 2.4; // High position requiring sliding
+                arch.castShadow = true;
+                group.add(arch);
+
+                // Pillar supports on sides
+                const p1Geo = new THREE.CylinderGeometry(0.15, 0.15, 3, 5);
+                const p1 = new THREE.Mesh(p1Geo, archMat);
+                p1.position.set(-1.1, 1.5, 0);
+                const p2 = p1.clone();
+                p2.position.set(1.1, 1.5, 0);
+                group.add(p1);
+                group.add(p2);
+            } 
+            else if (type === 'SPIKES') {
+                // Ground Spikes Block (MUST SWITCH LANES OR HIGH JUMP)
+                const baseGeo = new THREE.BoxGeometry(2.2, 0.8, 1.5);
+                const baseMat = new THREE.MeshLambertMaterial({ color: 0x7c2d12, flatShading: true });
+                const base = new THREE.Mesh(baseGeo, baseMat);
+                base.position.y = 0.4;
+                base.castShadow = true;
+                group.add(base);
+
+                // Spikes on top
+                for(let i = -0.8; i <= 0.8; i += 0.5) {
+                    const spikeGeo = new THREE.ConeGeometry(0.25, 0.8, 4);
+                    const spikeMat = new THREE.MeshLambertMaterial({ color: 0xd97706, flatShading: true });
+                    const spike = new THREE.Mesh(spikeGeo, spikeMat);
+                    spike.position.set(i, 1.0, 0);
+                    group.add(spike);
+                }
+            }
+
+            return group;
+        }
+
+        // Gold Coin Creator
+        function createCoin() {
+            const coinGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.1, 10);
+            const coinMat = new THREE.MeshStandardMaterial({ 
+                color: 0xfacc15, 
+                metalness: 0.8, 
+                roughness: 0.2,
+                emissive: 0x713f12
+            });
+            const coin = new THREE.Mesh(coinGeo, coinMat);
+            coin.rotation.x = Math.PI / 2;
+            coin.castShadow = true;
+            return coin;
+        }
+
+        function createTrackChunk(zPos) {
+            const chunk = new THREE.Group();
+            chunk.position.z = zPos;
+
+            // Stone / Path Floor
+            const pathGeo = new THREE.BoxGeometry(8, 0.2, TRACK_CHUNK_SIZE);
+            const pathMat = new THREE.MeshLambertMaterial({ color: 0x2d3a2b, flatShading: true });
+            const path = new THREE.Mesh(pathGeo, pathMat);
+            path.position.y = -0.1;
+            path.receiveShadow = true;
+            chunk.add(path);
+
+            // Center path stone tile highlights
+            const tileGeo = new THREE.BoxGeometry(6.5, 0.22, TRACK_CHUNK_SIZE);
+            const tileMat = new THREE.MeshLambertMaterial({ color: 0x3d4e3b, flatShading: true });
+            const tiles = new THREE.Mesh(tileGeo, tileMat);
+            tiles.position.y = -0.09;
+            tiles.receiveShadow = true;
+            chunk.add(tiles);
+
+            // Side Jungle Dirt Borders
+            const sideGeo = new THREE.BoxGeometry(10, 0.1, TRACK_CHUNK_SIZE);
+            const sideMat = new THREE.MeshLambertMaterial({ color: 0x172615, flatShading: true });
+            const leftSide = new THREE.Mesh(sideGeo, sideMat);
+            leftSide.position.set(-8, -0.15, 0);
+            const rightSide = new THREE.Mesh(sideGeo, sideMat);
+            rightSide.position.set(8, -0.15, 0);
+            chunk.add(leftSide);
+            chunk.add(rightSide);
+
+            // Add Scenery on sides (Trees & Ancient Ruins)
+            for (let z = -TRACK_CHUNK_SIZE/2 + 3; z < TRACK_CHUNK_SIZE/2; z += 8) {
+                // Left Jungle Foliage
+                const leftTree = createTree();
+                leftTree.position.set(-5.5 - Math.random() * 3, 0, z);
+                chunk.add(leftTree);
+
+                // Right Jungle Foliage
+                const rightTree = createTree();
+                rightTree.position.set(5.5 + Math.random() * 3, 0, z + 2);
+                chunk.add(rightTree);
+
+                // Occasional Ancient Ruins
+                if (Math.random() > 0.6) {
+                    const ruin = createRuinPillar();
+                    const side = Math.random() > 0.5 ? 1 : -1;
+                    ruin.position.set(side * (5.0 + Math.random() * 2), 0, z + 4);
+                    chunk.add(ruin);
+                }
+            }
+
+            scene.add(chunk);
+            return chunk;
+        }
+
+        // Spawn Game Entities (Obstacles & Collectibles) inside chunks
+        function populateChunk(zPos) {
+            // Don't spawn obstacles on initial starting tracks
+            if (zPos > -60) return;
+
+            const obstacleTypes = ['LOG', 'HIGH_BRANCH', 'SPIKES'];
+            const laneIndices = [0, 1, 2];
+
+            // Decide pattern for this chunk
+            const numObstacles = Math.floor(Math.random() * 2) + 1;
+            
+            for (let i = 0; i < numObstacles; i++) {
+                const lane = laneIndices.splice(Math.floor(Math.random() * laneIndices.length), 1)[0];
+                const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+                
+                const obs = createObstacle(type);
+                const obsZ = zPos + (Math.random() * (TRACK_CHUNK_SIZE - 10) - (TRACK_CHUNK_SIZE / 2 - 5));
+                obs.position.set(LANES[lane], 0, obsZ);
+                
+                scene.add(obs);
+                activeObstacles.push(obs);
+            }
+
+            // Spawn Coin Arc/Line in remaining open lane
+            if (laneIndices.length > 0) {
+                const coinLane = laneIndices[Math.floor(Math.random() * laneIndices.length)];
+                const coinZStart = zPos + (Math.random() * 10 - 5);
+                const coinCount = Math.floor(Math.random() * 4) + 3;
+
+                for (let c = 0; c < coinCount; c++) {
+                    const coin = createCoin();
+                    coin.position.set(LANES[coinLane], 1.2, coinZStart + (c * 2.2));
+                    scene.add(coin);
+                    activeCoins.push(coin);
+                }
+            }
+        }
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a1c0d);
+            scene.fog = new THREE.FogExp2(0x0a1c0d, 0.015);
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+            camera.position.set(0, 5, 8);
+            camera.lookAt(0, 2, -10);
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Lighting Setup
+            const ambientLight = new THREE.AmbientLight(0xdcfce7, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xfef08a, 1.1);
+            dirLight.position.set(20, 40, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 100;
+            dirLight.shadow.camera.left = -15;
+            dirLight.shadow.camera.right = 15;
+            dirLight.shadow.camera.top = 30;
+            dirLight.shadow.camera.bottom = -10;
+            scene.add(dirLight);
+
+            // Spawn Player
+            createPlayer();
+
+            // Initial Environment Chunks
+            for (let i = 0; i < VISIBLE_CHUNKS; i++) {
+                const zPos = -i * TRACK_CHUNK_SIZE;
+                const chunk = createTrackChunk(zPos);
+                activeChunks.push(chunk);
+                populateChunk(zPos);
+            }
+
+            // Window Resize Listener
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function setupControls() {
+            // Keyboard Controls
+            window.addEventListener('keydown', (e) => {
+                if (gameState !== 'PLAYING') return;
+
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                    moveLane(-1);
+                } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                    moveLane(1);
+                } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') {
+                    jump();
+                } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+                    slide();
+                }
+            });
+
+            // Mobile Touch Button Listeners
+            document.getElementById('btn-left').addEventListener('click', () => moveLane(-1));
+            document.getElementById('btn-right').addEventListener('click', () => moveLane(1));
+            document.getElementById('btn-jump').addEventListener('click', jump);
+            document.getElementById('btn-slide').addEventListener('click', slide);
+
+            // Swipe Detection for Mobile Canvas
+            window.addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }, { passive: true });
+
+            window.addEventListener('touchend', (e) => {
+                if (gameState !== 'PLAYING') return;
+                
+                const deltaX = e.changedTouches[0].clientX - touchStartX;
+                const deltaY = e.changedTouches[0].clientY - touchStartY;
+
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    // Horizontal Swipe
+                    if (Math.abs(deltaX) > 30) {
+                        if (deltaX > 0) moveLane(1);
+                        else moveLane(-1);
+                    }
+                } else {
+                    // Vertical Swipe
+                    if (Math.abs(deltaY) > 30) {
+                        if (deltaY < 0) jump();
+                        else slide();
+                    }
+                }
+            }, { passive: true });
+        }
+
+        function moveLane(direction) {
+            currentLane = Math.max(0, Math.min(2, currentLane + direction));
+            targetX = LANES[currentLane];
+        }
+
+        function jump() {
+            if (!isJumping && !isSliding) {
+                isJumping = true;
+                jumpVelocityY = 14;
+                sound.playJump();
+            }
+        }
+
+        function slide() {
+            if (!isSliding && !isJumping) {
+                isSliding = true;
+                slideTimer = 0.6; // Slide duration in seconds
+                
+                // Scale player down visually
+                playerGroup.scale.set(1, 0.45, 1);
+                playerGroup.position.y = -0.2;
+                sound.playSlide();
+            }
+        }
+
+        function resetSlide() {
+            isSliding = false;
+            playerGroup.scale.set(1, 1, 1);
+            playerGroup.position.y = 0;
+        }
+
+        function spawnCoinBurst(pos) {
+            for (let i = 0; i < 12; i++) {
+                const pGeo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+                const pMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+                const p = new THREE.Mesh(pGeo, pMat);
+                p.position.copy(pos);
+                
+                p.userData = {
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: Math.random() * 6 + 3,
+                    vz: (Math.random() - 0.5) * 8,
+                    life: 0.4
+                };
+                
+                scene.add(p);
+                activeParticles.push(p);
+            }
+        }
+
+        function spawnDustParticle() {
+            if (gameState !== 'PLAYING' || isJumping) return;
+
+            const pGeo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+            const pMat = new THREE.MeshBasicMaterial({ 
+                color: 0x86efac, 
+                transparent: true, 
+                opacity: 0.6 
+            });
+            const p = new THREE.Mesh(pGeo, pMat);
+            p.position.set(
+                playerGroup.position.x + (Math.random() - 0.5) * 0.4,
+                0.1,
+                playerGroup.position.z + 0.4
+            );
+            
+            p.userData = {
+                vx: (Math.random() - 0.5) * 1,
+                vy: Math.random() * 1.5 + 0.5,
+                vz: gameSpeed * 0.2,
+                life: 0.3
+            };
+
+            scene.add(p);
+            activeParticles.push(p);
+        }
+
+        let lastTime = performance.now();
+
+        function updateGame() {
+            const now = performance.now();
+            const delta = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+
+            if (gameState === 'PLAYING') {
+                // 1. Dynamic Speed & Distance Updates
+                distanceTraveled += gameSpeed * delta;
+                gameSpeed = INITIAL_SPEED + (distanceTraveled / 100) * SPEED_INCREMENT;
+                gameSpeed = Math.min(gameSpeed, MAX_SPEED);
+                
+                score = Math.floor(distanceTraveled * 2) + (coinsCollected * 50);
+
+                // Update HUD DOM Elements
+                document.getElementById('hud-distance').innerText = Math.floor(distanceTraveled);
+                document.getElementById('hud-score').innerText = score;
+                document.getElementById('hud-coins').innerText = coinsCollected;
+                document.getElementById('hud-speed').innerText = (gameSpeed / INITIAL_SPEED).toFixed(1);
+
+                // 2. Smooth Player Lane Movement
+                playerGroup.position.x += (targetX - playerGroup.position.x) * 15 * delta;
+
+                // 3. Jump Physics
+                if (isJumping) {
+                    playerGroup.position.y += jumpVelocityY * delta;
+                    jumpVelocityY -= 40 * delta; // Gravity
+
+                    if (playerGroup.position.y <= 0) {
+                        playerGroup.position.y = 0;
+                        isJumping = false;
+                        jumpVelocityY = 0;
+                    }
+                }
+
+                // 4. Slide Physics
+                if (isSliding) {
+                    slideTimer -= delta;
+                    if (slideTimer <= 0) {
+                        resetSlide();
+                    }
+                }
+
+                // Spawns running dust particles
+                if (Math.random() < 0.4) spawnDustParticle();
+
+                // 5. Move & Recycle Track Chunks
+                activeChunks.forEach(chunk => {
+                    chunk.position.z += gameSpeed * delta;
+                });
+
+                // Recycle oldest chunk if it passes behind camera
+                if (activeChunks[0].position.z > 20) {
+                    const oldChunk = activeChunks.shift();
+                    const furthestZ = activeChunks[activeChunks.length - 1].position.z;
+                    const newZ = furthestZ - TRACK_CHUNK_SIZE;
+                    oldChunk.position.z = newZ;
+                    activeChunks.push(oldChunk);
+                    populateChunk(newZ);
+                }
+
+                // 6. Move & Check Obstacles
+                for (let i = activeObstacles.length - 1; i >= 0; i--) {
+                    const obs = activeObstacles[i];
+                    obs.position.z += gameSpeed * delta;
+
+                    // Collision Detection Box
+                    const pX = playerGroup.position.x;
+                    const pZ = playerGroup.position.z;
+                    const oX = obs.position.x;
+                    const oZ = obs.position.z;
+
+                    const type = obs.userData.type;
+
+                    // Distance checks
+                    if (Math.abs(pZ - oZ) < 0.8 && Math.abs(pX - oX) < 1.0) {
+                        let crashed = false;
+
+                        if (type === 'LOG' || type === 'SPIKES') {
+                            // High Jump dodges low logs and spikes
+                            if (playerGroup.position.y < 0.8) {
+                                crashed = true;
+                            }
+                        } else if (type === 'HIGH_BRANCH') {
+                            // Slide dodges high branches
+                            if (!isSliding) {
+                                crashed = true;
+                            }
+                        }
+
+                        if (crashed) {
+                            gameOver();
+                            break;
+                        }
+                    }
+
+                    // Remove out of bounds obstacles
+                    if (obs.position.z > 15) {
+                        scene.remove(obs);
+                        activeObstacles.splice(i, 1);
+                    }
+                }
+
+                // 7. Move & Check Coins
+                for (let i = activeCoins.length - 1; i >= 0; i--) {
+                    const coin = activeCoins[i];
+                    coin.position.z += gameSpeed * delta;
+                    coin.rotation.z += 3 * delta; // Coin rotation animation
+
+                    const pX = playerGroup.position.x;
+                    const pY = playerGroup.position.y + 0.8;
+                    const pZ = playerGroup.position.z;
+
+                    const cX = coin.position.x;
+                    const cY = coin.position.y;
+                    const cZ = coin.position.z;
+
+                    // Coin pickup collision check
+                    if (Math.abs(pZ - cZ) < 1.0 && Math.abs(pX - cX) < 1.0 && Math.abs(pY - cY) < 1.5) {
+                        coinsCollected++;
+                        sound.playCoin();
+                        spawnCoinBurst(coin.position);
+                        scene.remove(coin);
+                        activeCoins.splice(i, 1);
+                    } else if (coin.position.z > 15) {
+                        scene.remove(coin);
+                        activeCoins.splice(i, 1);
+                    }
+                }
+            }
+
+            // Update Particle FX Animations
+            for (let i = activeParticles.length - 1; i >= 0; i--) {
+                const p = activeParticles[i];
+                p.userData.life -= delta;
+                
+                p.position.x += p.userData.vx * delta;
+                p.position.y += p.userData.vy * delta;
+                p.position.z += p.userData.vz * delta;
+
+                if (p.userData.life <= 0) {
+                    scene.remove(p);
+                    activeParticles.splice(i, 1);
+                }
+            }
+
+            // Camera Follow / Slight Sway
+            camera.position.x += (playerGroup.position.x * 0.3 - camera.position.x) * 5 * delta;
+
+            renderer.render(scene, camera);
+            requestAnimationFrame(updateGame);
+        }
+
+        function startGame() {
+            sound.init();
+
+            // Reset state variables
+            score = 0;
+            coinsCollected = 0;
+            distanceTraveled = 0;
+            gameSpeed = INITIAL_SPEED;
+            currentLane = 1;
+            targetX = 0;
+            playerGroup.position.set(0, 0, 0);
+            resetSlide();
+
+            // Clear old obstacles and coins
+            activeObstacles.forEach(obs => scene.remove(obs));
+            activeCoins.forEach(coin => scene.remove(coin));
+            activeParticles.forEach(p => scene.remove(p));
+            activeObstacles = [];
+            activeCoins = [];
+            activeParticles = [];
+
+            // Hide Modals, Show HUD
+            document.getElementById('start-modal').classList.add('hidden');
+            document.getElementById('gameover-modal').classList.add('hidden');
+            document.getElementById('hud').classList.remove('opacity-0');
+
+            gameState = 'PLAYING';
+        }
+
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            sound.playCrash();
+
+            // Save High Score & Max Distance
+            let isNewHigh = false;
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('jungle_runner_highscore', highScore.toString());
+                isNewHigh = true;
+            }
+
+            if (Math.floor(distanceTraveled) > highDistance) {
+                highDistance = Math.floor(distanceTraveled);
+                localStorage.setItem('jungle_runner_highdist', highDistance.toString());
+            }
+
+            // Populate Game Over Stats
+            document.getElementById('go-distance').innerText = Math.floor(distanceTraveled) + 'm';
+            document.getElementById('go-coins').innerText = coinsCollected;
+            document.getElementById('go-score').innerText = score;
+
+            const highTag = document.getElementById('new-highscore-tag');
+            if (isNewHigh) {
+                highTag.classList.remove('hidden');
+            } else {
+                highTag.classList.add('hidden');
+            }
+
+            // Update Start Screen Records
+            document.getElementById('start-high-score').innerText = highScore;
+            document.getElementById('start-high-distance').innerText = highDistance + 'm';
+
+            // Hide HUD, Show Game Over Screen
+            document.getElementById('hud').classList.add('opacity-0');
+            document.getElementById('gameover-modal').classList.remove('hidden');
+        }
+
+        window.onload = () => {
+            init3D();
+            setupControls();
+
+            // Initialize High Score Display on Start Modal
+            document.getElementById('start-high-score').innerText = highScore;
+            document.getElementById('start-high-distance').innerText = highDistance + 'm';
+
+            // Button Event Listeners
+            document.getElementById('btn-start').addEventListener('click', startGame);
+            document.getElementById('btn-restart').addEventListener('click', startGame);
+
+            // Tutorial Modal Listeners
+            const tutModal = document.getElementById('tutorial-modal');
+            document.getElementById('btn-tutorial').addEventListener('click', () => {
+                tutModal.classList.remove('hidden');
+            });
+            document.getElementById('btn-close-tutorial').addEventListener('click', () => {
+                tutModal.classList.add('hidden');
+            });
+
+            // Start Animation Loop
+            requestAnimationFrame(updateGame);
+        };
+    </script>
+</body>
+</html>
